@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  webapp:
+    build: .
+    container_name: discord-nas-webapp
+    command: python webapp/app.py # For production, use Gunicorn: gunicorn --bind 0.0.0.0:5000 webapp.app:app
+    ports:
+      - "5000:5000" # Map host port 5000 to container port 5000
+    volumes:
+      - ./.env:/app/.env:ro # Mount .env file read-only
+      - cache_data:/app/data/pending_uploads # Mount named volume for cache
+      - db_data:/app/data/database # Mount named volume for database
+      # Optional: Mount code for development hot-reloading (remove for production image)
+      # - ./webapp:/app/webapp
+    restart: unless-stopped
+    environment:
+      # Pass necessary env vars if not relying solely on .env file inside container
+      # Example: - FLASK_ENV=production (when using Gunicorn)
+      - PYTHONUNBUFFERED=1 # Ensure logs are shown immediately
+
+  bot:
+    build: .
+    container_name: discord-nas-bot
+    command: python bot/bot.py
+    volumes:
+      - ./.env:/app/.env:ro
+      - db_data:/app/data/database # Bot needs access to DB for context/status checks if implemented
+    depends_on:
+      - webapp # Optional: Wait for webapp to start (doesn't guarantee readiness)
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  uploader:
+    build: .
+    container_name: discord-nas-uploader
+    command: python uploader/uploader.py
+    volumes:
+      - ./.env:/app/.env:ro
+      - cache_data:/app/data/pending_uploads # Needs access to cache to read files
+      - db_data:/app/data/database # Needs access to DB to update status
+    depends_on:
+      - webapp # Optional: Wait for webapp (and thus DB init)
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+
+volumes:
+  cache_data: # Define named volume for the upload cache
+  db_data: # Define named volume for the SQLite database

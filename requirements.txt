@@ -1,0 +1,5 @@
+discord.py[voice]
+Flask
+python-dotenv
+webdavclient3
+requests
